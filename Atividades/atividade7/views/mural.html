@@ -2,98 +2,39 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mural</title>
+    <title>Mural de Mensagens</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div class="container mt-5">
-        <h2 class="text-center">Mural de Mensagens</h2>
-
-        <!-- Alternância entre mensagens e adicionar -->
-        <div class="text-center mb-4">
-            <button id="btnAddMessage" class="btn btn-secondary">Adicionar Mensagem</button>
-            <button id="btnViewMessages" class="btn btn-secondary">Ver Mensagens</button>
-        </div>
-
-        <!-- Formulário para adicionar mensagem -->
-        <div id="messageForm" style="display:none;">
-            <form id="addMessageForm">
-                <div class="form-group">
-                    <label for="messageTitle">Título</label>
-                    <input type="text" class="form-control" id="messageTitle" placeholder="Digite o título da mensagem" required>
-                </div>
-                <div class="form-group">
-                    <label for="messageText">Mensagem</label>
-                    <textarea class="form-control" id="messageText" rows="4" placeholder="Digite a mensagem" required></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Adicionar Mensagem</button>
-            </form>
-        </div>
-
-        <!-- Carrossel para visualizar mensagens -->
-        <div id="messageCarousel" class="carousel slide" data-ride="carousel">
-            <div class="carousel-inner" id="messageCards">
-                <!-- Mensagens serão carregadas aqui -->
-            </div>
-            <a class="carousel-control-prev" href="#messageCarousel" role="button" data-slide="prev">
-                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="sr-only">Previous</span>
-            </a>
-            <a class="carousel-control-next" href="#messageCarousel" role="button" data-slide="next">
-                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="sr-only">Next</span>
-            </a>
-        </div>
+    <div class="container">
+        <h2>Mural de Mensagens</h2>
+        <div id="mensagens" class="row"></div>
     </div>
 
     <script>
-        const btnAddMessage = document.getElementById("btnAddMessage");
-        const btnViewMessages = document.getElementById("btnViewMessages");
-        const messageForm = document.getElementById("messageForm");
-        const messageCarousel = document.getElementById("messageCarousel");
-
-        btnAddMessage.addEventListener("click", () => {
-            messageForm.style.display = "block";
-            messageCarousel.style.display = "none";
-        });
-
-        btnViewMessages.addEventListener("click", () => {
-            messageForm.style.display = "none";
-            messageCarousel.style.display = "block";
-            loadMessages();
-        });
-
-        function loadMessages() {
-            const messages = JSON.parse(localStorage.getItem("messages")) || [];
-            const messageCards = document.getElementById("messageCards");
-            messageCards.innerHTML = "";
-
-            messages.forEach((msg, index) => {
-                const activeClass = index === 0 ? "active" : "";
-                messageCards.innerHTML += `
-                    <div class="carousel-item ${activeClass}">
-                        <div class="d-block w-100 bg-light p-3 rounded">
-                            <h5>${msg.title}</h5>
-                            <p>${msg.text}</p>
+        fetch('/api/mensagens', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        })
+        .then(res => res.json())
+        .then(mensagens => {
+            const mural = document.getElementById('mensagens');
+            mensagens.forEach(mensagem => {
+                const card = document.createElement('div');
+                card.classList.add('col-md-4', 'mb-4');
+                card.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${mensagem.autor}</h5>
+                            <p class="card-text">${mensagem.conteudo}</p>
+                            <small class="text-muted">${new Date(mensagem.data).toLocaleString()}</small>
                         </div>
                     </div>
                 `;
+                mural.appendChild(card);
             });
-        }
-
-        document.getElementById("addMessageForm").addEventListener("submit", function(event) {
-            event.preventDefault();
-            const title = document.getElementById("messageTitle").value;
-            const text = document.getElementById("messageText").value;
-            const messages = JSON.parse(localStorage.getItem("messages")) || [];
-            messages.push({ title, text });
-            localStorage.setItem("messages", JSON.stringify(messages));
-            loadMessages();
-            messageForm.style.display = "none";
-            messageCarousel.style.display = "block";
-        });
+        })
+        .catch(() => alert('Erro ao carregar mensagens.'));
     </script>
 </body>
 </html>

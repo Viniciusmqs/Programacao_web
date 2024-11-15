@@ -1,108 +1,92 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const bodyParser = require('body-parser');
 
 const app = express();
 const PORT = 3000;
+const SECRET = 'meusegredo'; // Segredo do JWT
+const USUARIOS_FILE = path.join(__dirname, 'data', 'usuarios.json');
 
+
+// Configuração
+app.use(bodyParser.json());
 app.use(express.static('public'));
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(session({
-  secret: 'segredo',
-  resave: false,
-  saveUninitialized: true
-}));
 
-let usuarios = JSON.parse(fs.readFileSync('./data/usuarios.json', 'utf-8'));
-let mensagens = []; // Array para armazenar as mensagens
+// Funções utilitárias
+const carregarUsuarios = () => {
+    if (!fs.existsSync(USUARIOS_FILE)) {
+        fs.writeFileSync(USUARIOS_FILE, JSON.stringify([]));
+    }
+    return JSON.parse(fs.readFileSync(USUARIOS_FILE, 'utf-8'));
+};
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'index.html'));
-});
+const salvarUsuarios = (usuarios) => {
+    fs.writeFileSync(USUARIOS_FILE, JSON.stringify(usuarios, null, 4));
+};
 
-app.get('/cadastro', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'cadastro.html'));
-});
+// Middleware para autenticação
+function autenticar(req, res, next) {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).send('Token não fornecido.');
 
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'login.html'));
-});
+    jwt.verify(token, SECRET, (err, decoded) => {
+        if (err) return res.status(403).send('Token inválido.');
+        req.usuario = decoded;
+        next();
+    });
+}
 
-app.get('/mensagem', (req, res) => {
-  if (req.session.usuario) {
-    res.sendFile(path.join(__dirname, 'views', 'mensagem.html'));
-  } else {
-    res.redirect('/login');
-  }
-});
-
-app.get('/mural', (req, res) => {
-  if (req.session.usuario) {
-    const html = `
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Mural de Mensagens</title>
-        <link rel="stylesheet" href="/public/styles.css">
-      </head>
-      <body>
-        <h1>Mural de Mensagens</h1>
-        <div id="mural-container">
-          ${mensagens.length > 0 ? mensagens.map(msg => `
-            <div class="mensagem">
-              <h3>${msg.titulo}</h3>
-              <p>${msg.conteudo}</p>
-            </div>
-          `).join('') : '<p>Nenhuma mensagem disponível</p>'}
-        </div>
-        <button onclick="window.location.href='/mensagem'">Voltar</button>
-      </body>
-      </html>
-    `;
-    res.send(html);
-  } else {
-    res.redirect('/login');
-  }
-});
-
+// Rotas de API
 app.post('/cadastro', (req, res) => {
-  const { nome, senha } = req.body;
-  const usuarioExiste = usuarios.find(u => u.nome === nome);
-  if (!usuarioExiste) {
+    const { nome, senha } = req.body;
+    const usuarios = carregarUsuarios();
+
+    if (usuarios.find(u => u.nome === nome)) {
+        return res.status(400).send('Usuário já existe.');
+    }
+
     usuarios.push({ nome, senha });
-    fs.writeFileSync('./data/usuarios.json', JSON.stringify(usuarios, null, 2));
-    res.redirect('/login');
-  } else {
-    res.send('Usuário já existe');
-  }
+    salvarUsuarios(usuarios);
+    res.send('Usuário cadastrado com sucesso.');
 });
 
 app.post('/login', (req, res) => {
-  const { nome, senha } = req.body;
-  const usuario = usuarios.find(u => u.nome === nome && u.senha === senha);
-  if (usuario) {
-    req.session.usuario = usuario;
-    res.redirect('/mensagem');
-  } else {
-    res.send('Login ou senha incorretos');
-  }
+    const { nome, senha } = req.body;
+    const usuarios = carregarUsuarios();
+
+    const usuario = usuarios.find(u => u.nome === nome && u.senha === senha);
+    if (!usuario) return res.status(401).send('Credenciais inválidas.');
+
+    const token = jwt.sign({ nome }, SECRET, { expiresIn: '1h' });
+    res.json({ token });
 });
 
-app.post('/nova-mensagem', (req, res) => {
-  const { titulo, conteudo } = req.body;
-  mensagens.push({ titulo, conteudo });
-  res.redirect('/mural');
+const mensagens = []; // Simula mensagens no servidor
+
+app.get('/api/mensagens', autenticar, (req, res) => {
+    res.json(mensagens);
 });
 
-app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/');
+app.post('/api/mensagens', autenticar, (req, res) => {
+    const { conteudo } = req.body;
+    if (!conteudo) return res.status(400).send('Conteúdo não pode ser vazio.');
+
+    mensagens.push({
+        autor: req.usuario.nome,
+        conteudo,
+        data: new Date()
+    });
+    res.send('Mensagem adicionada com sucesso.');
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
-});
+// Rotas de páginas HTML
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'index.html')));
+app.get('/cadastro', (req, res) => res.sendFile(path.join(__dirname, 'views', 'cadastro.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views', 'login.html')));
+app.get('/mensagem', (req, res) => res.sendFile(path.join(__dirname, 'views', 'mensagem.html')));
+app.get('/mural', (req, res) => res.sendFile(path.join(__dirname, 'views', 'mural.html')));
+
+// Iniciar servidor
+app.listen(PORT, () => console.log(`Servidor rodando em http://localhost:${PORT}`));

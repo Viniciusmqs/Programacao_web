@@ -1,49 +1,45 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Página de Mensagem</title>
-  <link rel="stylesheet" href="/styles.css">
+    <meta charset="UTF-8">
+    <title>Nova Mensagem</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <h1>Bem-vindo ao Mural de Mensagens!</h1>
-  <div id="menu">
-    <button id="btnNovaMensagem">Nova Mensagem</button>
-    <button id="btnVerMural">Ver Mural</button>
-    <button onclick="window.location.href='/logout'">Logout</button>
-  </div>
+    <div class="container">
+        <h2>Criar Nova Mensagem</h2>
+        <form id="mensagemForm">
+            <div class="form-group">
+                <label for="conteudo">Mensagem</label>
+                <textarea id="conteudo" class="form-control" rows="3" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Enviar</button>
+        </form>
+    </div>
 
-  <form id="formNovaMensagem" action="/nova-mensagem" method="POST" style="display: none;">
-    <input type="text" name="titulo" placeholder="Título" required>
-    <textarea name="conteudo" placeholder="Conteúdo" required></textarea>
-    <button type="submit">Enviar</button>
-    <button type="button" id="btnCancelar">Cancelar</button>
-  </form>
+    <script>
+        document.getElementById('mensagemForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const conteudo = document.getElementById('conteudo').value;
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const btnNovaMensagem = document.getElementById('btnNovaMensagem');
-      const btnVerMural = document.getElementById('btnVerMural');
-      const formNovaMensagem = document.getElementById('formNovaMensagem');
-      const btnCancelar = document.getElementById('btnCancelar');
-
-      btnNovaMensagem.addEventListener('click', () => {
-        formNovaMensagem.style.display = 'block';
-        btnNovaMensagem.style.display = 'none';
-        btnVerMural.style.display = 'none';
-      });
-
-      btnCancelar.addEventListener('click', () => {
-        formNovaMensagem.style.display = 'none';
-        btnNovaMensagem.style.display = 'inline-block';
-        btnVerMural.style.display = 'inline-block';
-      });
-
-      btnVerMural.addEventListener('click', () => {
-        window.location.href = '/mural';
-      });
-    });
-  </script>
+            fetch('/api/mensagens', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ conteudo }),
+            })
+            .then(res => {
+                if (res.ok) {
+                    alert('Mensagem enviada com sucesso!');
+                    window.location.href = '/mural';
+                } else {
+                    alert('Erro ao enviar mensagem.');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
